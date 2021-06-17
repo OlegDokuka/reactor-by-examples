@@ -1,9 +1,8 @@
 package org.test.reactive;
 
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -15,10 +14,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.Blackhole;
-import org.openjdk.jmh.runner.RunnerException;
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
 @BenchmarkMode(Mode.Throughput)
 @Warmup(iterations = 2, time = 5)
@@ -26,28 +22,28 @@ import reactor.core.scheduler.Schedulers;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(value = 1)
 @State(Scope.Thread)
-public class PublishOnPerfTest {
-    @Param({ "1000000" })
+public class FMapVsCMapPerfTest {
+    @Param({ "10000" })
     public int times;
 
-    Flux<Object> source;
+    Flux<Integer> source;
 
     @Setup
     public void setup() {
-        source = Flux.range(0, times).map(__ -> new Object());
+        source = Flux.range(0, times).hide();
     }
 
     @Benchmark
-    public void measure256() {
+    public void flatMap() {
         source
-            .publishOn(Schedulers.parallel(), 256)
+            .flatMap(i -> Flux.fromStream(IntStream.range(i, i + 512).boxed()))
             .blockLast();
     }
 
     @Benchmark
-    public void measure64() {
+    public void concatMap() {
         source
-            .publishOn(Schedulers.parallel(), 64)
+            .concatMapIterable(i -> IntStream.range(i, i + 512).boxed().collect(Collectors.toList()))
             .blockLast();
     }
 }

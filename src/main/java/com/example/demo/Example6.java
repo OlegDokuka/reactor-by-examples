@@ -12,9 +12,9 @@ public class Example6 {
 
   public static void main(String[] args) throws InterruptedException {
 
-    Flux.range(0, 100000)
-        .log("here", Level.INFO, SignalType.REQUEST)
-        .flatMap(i -> Mono.never(), 64)
+    Flux.range(0, 1000000)
+//        .log("here", Level.INFO, SignalType.REQUEST)
+        .flatMap(i -> Flux.range(0, 100).log("inner"), 1, 32)
         .blockLast();
     // todo flatMap
 

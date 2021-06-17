@@ -12,10 +12,9 @@ public class Example5 {
 
   public static void main(String[] args) throws InterruptedException {
     // TODO publishOn
-    Flux.interval(Duration.ofMillis(10))
-        .buffer()
-        .log("here", Level.INFO, SignalType.REQUEST)
-        .publishOn(Schedulers.parallel(), false, 6)
+    Flux.range(0, 100000)
+        .log("here", Level.INFO, SignalType.REQUEST, SignalType.ON_NEXT)
+        .publishOn(Schedulers.parallel(), 1024)
         .doOnNext((t) -> {
           try {
             networkCall().call();
@@ -23,7 +22,7 @@ public class Example5 {
 
           }
         })
-        .log()
+        .log("before.publish.on")
         .blockLast();
     Thread.sleep(100000);
   }

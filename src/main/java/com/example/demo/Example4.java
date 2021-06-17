@@ -23,28 +23,7 @@ static final Logger logger = LoggerFactory.getLogger(Example4.class);
 
     Flux.range(0, 100000)
         .log("here", Level.INFO, SignalType.REQUEST)
-        .subscribe(new BaseSubscriber<Integer>() {
-          final int requestLimit = 256;
-
-          int processedElements = 0;
-
-          @Override
-          protected void hookOnSubscribe(Subscription subscription) {
-            es.submit(() -> subscription.request(requestLimit));
-          }
-
-          @Override
-          protected void hookOnNext(Integer value) {
-            es.submit(() -> {
-              processedElements++;
-
-              logger.info("Got value {}", value);
-              if (processedElements == requestLimit) {
-                request(requestLimit);
-              }
-            });
-          }
-        });
+        .subscribe();
     Thread.sleep(100000);
   }
 

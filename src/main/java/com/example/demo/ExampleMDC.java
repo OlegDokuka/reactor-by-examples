@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -16,8 +17,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +28,12 @@ import org.slf4j.MDC;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
 import reactor.core.Fuseable.QueueSubscription;
+import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Operators;
+import reactor.core.publisher.Signal;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Loggers;
 import reactor.util.context.Context;
@@ -36,11 +41,11 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 public class ExampleMDC {
+
   static final Logger logger = LoggerFactory.getLogger(ExampleMDC.class);
 
   public static void main(String[] args) {
     Loggers.useSl4jLoggers();
-    MDC.put("trace", "12312-1231-321");
 
 //    Hooks.onEachOperator("mdcContextAspecet", new Function<Publisher<Object>, Publisher<Object>>() {
 //      @Override
@@ -52,15 +57,38 @@ public class ExampleMDC {
 //      }
 //    });
 
+//    Hooks.addQueueWrapper("mdcContextAspect", MDCQueue::new);
+//    Schedulers.addExecutorServiceDecorator("mdcContextAspect", (scheduler, es) -> {
+//      return new MDCScheduledExecutorService(es);
+//    });
 
-    Hooks.addQueueWrapper("mdcContextAspect", MDCQueue::new);
-    Schedulers.addExecutorServiceDecorator("mdcContextAspect", (scheduler, es) -> {
-      return new MDCScheduledExecutorService(es);
-    });
+    MDC.put("trace", "12312-1231-321");
 
-    Flux.interval(Duration.ofMillis(10))
+//    Schedulers
+
+//    Hooks.onEachOperator(objectPublisher -> {
+//      final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
+//      return Operators.lift(
+//          ((scannable, subscriber) -> new MDCSubscriber<Object>(copyOfContextMap, (CoreSubscriber) subscriber))).apply(objectPublisher);
+//    });
+
+
+    Hooks.addQueueWrapper("mdc", MDCQueue::new);
+    Schedulers.addExecutorServiceDecorator("mdc", (scheduler, es) -> new MDCScheduledExecutorService(es));
+
+
+
+    final Flux<Long> my_custom_single = Flux.interval(Duration.ofMillis(10))
         // mdcSubscriberOperator Here
         .subscribeOn(Schedulers.newSingle("my custom single"))
+        .doOnEach(new Consumer<Signal<Long>>() {
+          final String name = "asdas";
+
+          @Override
+          public void accept(Signal<Long> signal) {
+            logger.info("Hello World with signal [{}]", signal);
+          }
+        })
         // mdcSubscriberOperator Here
         .map(String::valueOf)
         // mdcSubscriberOperator Here
@@ -76,7 +104,11 @@ public class ExampleMDC {
         // mdcSubscriberOperator Here
         .subscribeOn(Schedulers.boundedElastic())
         // mdcSubscriberOperator Here
-        .contextWrite(Context.of(MDC.getCopyOfContextMap()))
+        .log("thread.before.subscribeOn")
+        // mdcSubscriberOperator Here
+        .contextWrite(Context.of(MDC.getCopyOfContextMap()));
+
+    my_custom_single
         // mdcSubscriberOperator Here
         .blockLast();
   }
@@ -88,7 +120,7 @@ public class ExampleMDC {
     } catch (InterruptedException e) {
     }
 
-    MDC.put("trace", MDC.get("trace") + "slept[" + (System.currentTimeMillis() - start) + "]");
+     MDC.put("trace", MDC.get("trace") + "slept[" + (System.currentTimeMillis() - start) + "] " + value);
   }
 
 
@@ -401,7 +433,9 @@ public class ExampleMDC {
     @Override
     public void onNext(Object o) {
       try {
-        MDC.setContextMap(mdcContext);
+        if (MDC.get("trace") == null) {
+          MDC.setContextMap(mdcContext);
+        }
         downstream.onNext(o);
       } finally {
         MDC.clear();

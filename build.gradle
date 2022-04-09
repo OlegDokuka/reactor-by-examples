@@ -1,5 +1,5 @@
 plugins {
-	id 'org.springframework.boot' version '2.4.5'
+	id 'org.springframework.boot' version '2.5.7'
 	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
 	id 'java'
 	id "me.champeau.jmh" version "0.6.4"
@@ -21,10 +21,15 @@ jmh {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'io.projectreactor:reactor-core'
+	implementation 'io.projectreactor:reactor-test'
+	implementation 'io.projectreactor:reactor-tools'
+	implementation 'io.socket:socket.io-client:1.0.0'
+	implementation 'io.projectreactor.tools:blockhound:1.0.6.RELEASE'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
-	jmh 'org.openjdk.jmh:jmh-core:1.30'
-	jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.30'
+	jmh 'org.openjdk.jmh:jmh-core:1.32'
+	jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.32'
 }
 
 test {

@@ -1,42 +1,59 @@
 package com.example.demo;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import reactor.core.publisher.BaseSubscriber;
+import reactor.core.publisher.BufferOverflowStrategy;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
+import reactor.core.scheduler.Schedulers;
 
 public class Example7 {
+  static final Logger logger = LoggerFactory.getLogger(Example7.class);
 
   public static void main(String[] args) throws InterruptedException {
-//
-//    // TODO: concatMap
-//    final Flux<Flux<Integer>> window = Flux.range(0, 100000)
-//        .log("here", Level.INFO, SignalType.REQUEST)
-//        .concatMap(i -> Mono.just(i), 0)
-//        .log("after")
-//        .windowTimeout(100, Duration.ofMinutes(1));
-//    window
-//        .concatMap(inner -> inner.count())
-//        .subscribe(new BaseSubscriber<Integer>() {
-//          @Override
-//          protected void hookOnSubscribe(Subscription subscription) {
-//            subscription.request(1);
-//          }
-//        });
 
+    final ExecutorService executorService = Executors.newWorkStealingPool();
 
+    Flux.interval(Duration.ofMillis(1))
+        .log("top")
+        .map(Function.identity())
+        .map(String::valueOf)
+        .buffer(Duration.ofMillis(100))
+        .take(20)
+        .publishOn(Schedulers.boundedElastic(), false, 64)
+        .log("bottom")
+        .subscribe(new BaseSubscriber<List<String>>() {
+          long receivedCnt = 0;
+          long requesteCnt = 0;
 
-//    Mono.deferContextual((contextView) -> {
-//      return Mono.just("")
-//          .log("Request[xyz][session:" + contextView.get() + "]", Level.INFO, SignalType.REQUEST, )
-//    })
+          @Override
+          protected void hookOnSubscribe(Subscription subscription) {
+            requesteCnt = 10;
+            subscription.request(32);
+          }
+
+          @Override
+          protected void hookOnNext(List<String> value) {
+          }
+
+          @Override
+          protected void hookFinally(SignalType type) {
+
+          }
+        });
+
 
     Thread.sleep(100000);
-  }
-
-
-  static Callable<Integer> expensiveProcessing() {
-    return () -> {
-      Thread.sleep(10000);
-      return 100000;
-    };
   }
 
 }

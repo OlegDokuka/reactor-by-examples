@@ -37,6 +37,7 @@ import reactor.core.publisher.Signal;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Loggers;
 import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
@@ -47,40 +48,34 @@ public class ExampleMDC {
   public static void main(String[] args) {
     Loggers.useSl4jLoggers();
 
-//    Hooks.onEachOperator("mdcContextAspecet", new Function<Publisher<Object>, Publisher<Object>>() {
-//      @Override
-//      public Publisher<Object> apply(Publisher<Object> objectPublisher) {
-//        final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
-//        return Operators.lift((__, downstreamSubsriber) -> {
-//          return new MDCSubscriber<Object>(copyOfContextMap, downstreamSubsriber);
-//        }).apply(objectPublisher);
-//      }
-//    });
+/*    Hooks.onEachOperator("mdcContextAspecet", new Function<Publisher<Object>, Publisher<Object>>() {
+      @Override
+      public Publisher<Object> apply(Publisher<Object> objectPublisher) {
+        final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
 
-//    Hooks.addQueueWrapper("mdcContextAspect", MDCQueue::new);
-//    Schedulers.addExecutorServiceDecorator("mdcContextAspect", (scheduler, es) -> {
-//      return new MDCScheduledExecutorService(es);
-//    });
+        final Function<? super Publisher<Object>, ? extends Publisher<Object>> lift =
+            Operators.lift((__, downstreamSubsriber) -> { // Operators.lift - is a way to create custom operator
+              return new MDCSubscriber<Object>(copyOfContextMap, downstreamSubsriber);
+            });
+
+        return lift.apply(objectPublisher);
+      }
+    });*/
+
+    Hooks.addQueueWrapper("mdcContextAspect", MDCQueue::new);
+    Schedulers.addExecutorServiceDecorator("mdcContextAspect", (scheduler, es) -> {
+      return new MDCScheduledExecutorService(es);
+    });
+
+
 
     MDC.put("trace", "12312-1231-321");
-
-//    Schedulers
-
-//    Hooks.onEachOperator(objectPublisher -> {
-//      final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
-//      return Operators.lift(
-//          ((scannable, subscriber) -> new MDCSubscriber<Object>(copyOfContextMap, (CoreSubscriber) subscriber))).apply(objectPublisher);
-//    });
-
-
-    Hooks.addQueueWrapper("mdc", MDCQueue::new);
-    Schedulers.addExecutorServiceDecorator("mdc", (scheduler, es) -> new MDCScheduledExecutorService(es));
-
 
 
     final Flux<Long> my_custom_single = Flux.interval(Duration.ofMillis(10))
         // mdcSubscriberOperator Here
         .subscribeOn(Schedulers.newSingle("my custom single"))
+
         .doOnEach(new Consumer<Signal<Long>>() {
           final String name = "asdas";
 
@@ -89,24 +84,28 @@ public class ExampleMDC {
             logger.info("Hello World with signal [{}]", signal);
           }
         })
-        // mdcSubscriberOperator Here
         .map(String::valueOf)
-        // mdcSubscriberOperator Here
         .log("thread.boundary.before")
-        // mdcSubscriberOperator Here
-        .publishOn(Schedulers.single())
-        // mdcSubscriberOperator Here
+        .publishOn(Schedulers.single(), Integer.MAX_VALUE) // queue
+        // adding context in the decorator before calling process event
         .doOnNext(ExampleMDC::processEvent)
-        // mdcSubscriberOperator Here
+        // adding context
+        // replacing previous MDC context with the remembered
         .map(Long::parseLong)
-        // mdcSubscriberOperator Here
         .log("thread.boundary.after")
-        // mdcSubscriberOperator Here
         .subscribeOn(Schedulers.boundedElastic())
-        // mdcSubscriberOperator Here
         .log("thread.before.subscribeOn")
-        // mdcSubscriberOperator Here
-        .contextWrite(Context.of(MDC.getCopyOfContextMap()));
+
+        .publishOn(Schedulers.boundedElastic(), Integer.MAX_VALUE) // queue
+                .doOnEach(new Consumer<Signal<Long>>() {
+                  final String name = "asdas";
+
+                  @Override
+                  public void accept(Signal<Long> signal) {
+                    logger.info("Hello World with signal [{}]", signal);
+                  }
+                })
+        .contextWrite(Context.of("mdc" ,MDC.getCopyOfContextMap()));
 
     my_custom_single
         // mdcSubscriberOperator Here
@@ -120,7 +119,8 @@ public class ExampleMDC {
     } catch (InterruptedException e) {
     }
 
-     MDC.put("trace", MDC.get("trace") + "slept[" + (System.currentTimeMillis() - start) + "] " + value);
+     MDC.put("trace",
+             MDC.get("trace")+ " " + value);
   }
 
 
@@ -297,8 +297,8 @@ public class ExampleMDC {
     }
 
     @Override
-    public boolean add(Object o) {
-      return ((Queue) q).add(Tuples.of(MDC.getCopyOfContextMap(), o));
+    public boolean add(Object message) {
+      return ((Queue) q).add(Tuples.of(MDC.getCopyOfContextMap(), message));
     }
 
     @Override
@@ -433,9 +433,7 @@ public class ExampleMDC {
     @Override
     public void onNext(Object o) {
       try {
-        if (MDC.get("trace") == null) {
-          MDC.setContextMap(mdcContext);
-        }
+        MDC.setContextMap(mdcContext);
         downstream.onNext(o);
       } finally {
         MDC.clear();

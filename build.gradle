@@ -1,32 +1,90 @@
+buildscript {
+  repositories {
+	mavenCentral()
+  }
+}
+
 plugins {
-	id 'org.springframework.boot' version '2.4.5'
-	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-	id 'java'
-	id "me.champeau.jmh" version "0.6.4"
+  id "io.spring.dependency-management" version "1.0.15.RELEASE" apply false
+  id 'org.springframework.boot' version '3.0.6' apply false
 }
 
 group = 'com.example'
-version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '11'
 
 repositories {
 	mavenCentral()
 }
 
-jmh {
-	profilers = ['org.test.reactive.MaxMemoryProfiler', 'gc']
-	duplicateClassesStrategy = DuplicatesStrategy.WARN
+def printOutput(def output) {
+  return tasks.create("printOutput") {
+	for (line in output.toString().readLines()) {
+	  println "#educational_plugin" + line
+	}
+  }
 }
 
-dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter'
+subprojects {
+  apply plugin: 'application'
+  apply plugin: 'java'
+  apply plugin: 'io.spring.dependency-management'
+
+  version = '0.0.1-SNAPSHOT'
+  sourceCompatibility = '17'
+
+  repositories {
+	mavenCentral()
+  }
+
+  ext {
+	junitBomVersion='5.9.1'
+	reactorBomVersion='2022.0.6'
+	logbackVersion='1.2.6'
+
+	socketIOVersion='1.0.2'
+  }
+
+  dependencyManagement {
+	imports {
+	  mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+	}
+  }
+
+  dependencies {
+	implementation platform('io.projectreactor:reactor-bom:' + reactorBomVersion)
+
+	implementation 'ch.qos.logback:logback-core:' + logbackVersion
+	implementation 'ch.qos.logback:logback-classic:' + logbackVersion
+	implementation 'org.slf4j:slf4j-api:1.7.36'
+
+
+	implementation 'org.springframework.boot:spring-boot-starter-logging'
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'io.projectreactor:reactor-core'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation platform('org.junit:junit-bom:' + junitBomVersion)
+	testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+  }
 
-	jmh 'org.openjdk.jmh:jmh-core:1.30'
-	jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.30'
-}
+  sourceSets {
+	main {
+	  java.srcDir 'src'
+	  resources.srcDirs 'resources'
+	}
+	test {
+	  java.srcDir 'test'
+	  resources.srcDirs 'resources'
+	}
+	resources
+  }
 
-test {
+  mainClassName = project.hasProperty("mainClass") ? project.getProperty("mainClass") : ""
+
+  def runOutput = new ByteArrayOutputStream()
+  tasks.run.setStandardOutput(runOutput)
+  tasks.run.doLast { printOutput(runOutput) }
+
+  test {
 	useJUnitPlatform()
+  }
 }

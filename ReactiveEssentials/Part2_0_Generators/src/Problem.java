@@ -1,6 +1,8 @@
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import reactor.core.publisher.Flux;
@@ -12,19 +14,50 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class Problem {
 
 
-	public static void main(String[] args) {
-		Stream<Long> streamFibonacci = generateFibonacciSequenceTill(5);
+	public static void main(String[] args) throws InterruptedException {
+		Stream<Long> streamFibonacci1 = generateFibonacciSequenceTill(5);
 
-		streamFibonacci
-				.peek(System.out::println)
-				.count();
+//		streamFibonacci1.forEach(System.out::println);
+
+//		System.exit(-9);
+
+		for (int i = 0; i < 1000; i++) {
+			Stream<Long> streamFibonacci = generateFibonacciSequenceTill(5);
+			CountDownLatch cdl = new CountDownLatch(2);
+
+			int localI = i;
+
+			new Thread(() -> {
+				cdl.countDown();
+				try {
+					cdl.await();
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+				streamFibonacci
+						.peek(x -> System.out.println(x + " " + localI))
+						.count();
+			}).start();
 
 
-//		System.out.println("---one more---");
+//			System.out.println("---one more---");
 
-//		streamFibonacci
-//				.peek(System.out::println)
-//				.count();
+			new Thread(() -> {
+				cdl.countDown();
+				try {
+					cdl.await();
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+
+				streamFibonacci
+						.peek(x -> System.out.println(x + " " + localI))
+						.count();
+			}).start();
+
+		}
+
+		Thread.sleep(1000);
 	}
 
 

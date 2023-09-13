@@ -1,3 +1,5 @@
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
+
 buildscript {
   repositories {
 	mavenCentral()
@@ -5,7 +7,7 @@ buildscript {
 }
 
 plugins {
-  id "io.spring.dependency-management" version "1.0.15.RELEASE" apply false
+  id "io.spring.dependency-management" version "1.1.0" apply false
   id 'org.springframework.boot' version '3.0.6' apply false
 }
 
@@ -45,7 +47,7 @@ subprojects {
 
   dependencyManagement {
 	imports {
-	  mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+	  mavenBom SpringBootPlugin.BOM_COORDINATES
 	}
   }
 

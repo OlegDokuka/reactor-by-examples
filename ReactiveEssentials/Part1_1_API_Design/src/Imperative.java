@@ -14,6 +14,7 @@ public class Imperative {
 	static boolean validate(int input) {
 //		return true; // valid
 		return false; // invalid
+//      return null // impossible
 //		throw new IllegalArgumentException("invalid")  // ??? - possible but never used
 	}
 }
